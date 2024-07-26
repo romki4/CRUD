@@ -8,6 +8,8 @@ class AddCustomRouteContent extends Command
 {
     use \Backpack\CRUD\app\Console\Commands\Traits\PrettyCommandOutput;
 
+    private $backpackCustomRouteFile = 'routes/backpack/custom.php';
+
     /**
      * The name and signature of the console command.
      *
@@ -66,9 +68,10 @@ class AddCustomRouteContent extends Command
 
         // clean the content from comments etc
         $cleanContent = $this->cleanContentArray($originalContent);
+        $cleanCode = $this->cleanCodeString($code);
 
         // if the content contains code, don't add it again.
-        if (array_search($code, $cleanContent, true) !== false) {
+        if (array_search($cleanCode, $cleanContent, true) !== false) {
             $this->closeProgressBlock('Already existed', 'yellow');
 
             return;
@@ -96,10 +99,21 @@ class AddCustomRouteContent extends Command
         $this->closeProgressBlock('done', 'green');
     }
 
+    private function cleanCodeString($code)
+    {
+        $code = trim($code);
+        $code = str_replace('"', "'", $code);
+        $code = preg_replace('/function\(.*\)/', '', $code);
+        $code = preg_replace('/fn\(.*\)/', '', $code);
+        $code = preg_replace('/\[.*\]/', '', $code);
+        
+        return $code;
+    }
+
     private function cleanContentArray(array $content)
     {
         return array_filter(array_map(function ($line) {
-            $lineText = trim($line);
+            $lineText = trim($line);            
             if ($lineText === '' ||
                 $lineText === '\n' ||
                 $lineText === '\r' ||
@@ -118,6 +132,18 @@ class AddCustomRouteContent extends Command
                 return null;
             }
 
+            // replace all double quotes with single quotes for easier comparison
+            $lineText = str_replace('"', "'", $lineText);
+
+            // if line starts with Route:: remove anything as function() { ... } and fn () => ...;
+            if (str_starts_with($lineText, 'Route::')) {
+                $lineText = preg_replace('/function\(.*\)/', '', $lineText);
+                $lineText = preg_replace('/fn\(.*\)/', '', $lineText);
+            }
+
+            // remove everything inside [] 
+            $lineText = preg_replace('/\[.*\]/', '', $lineText);
+            
             return $lineText;
         }, $content));
     }
